@@ -218,3 +218,19 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# secrets
+.env
+.env.*
+!.env.example
+
+# real bank data (only the synthetic fixtures are allowed in the repo)
+*.csv
+!tests/fixtures/*.csv
+*.pdf
+*.xlsx
+
+# local database data and editor files
+pgdata/
+.vscode/
+.idea/
+.DS_Store
