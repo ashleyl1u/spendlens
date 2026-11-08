@@ -3,3 +3,7 @@ uvicorn[standard]
 sqlalchemy
 alembic
 psycopg[binary]
+pydantic[email]
+python-multipart
+pyjwt
+pwdlib[argon2]
