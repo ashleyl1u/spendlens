@@ -4,45 +4,11 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 
-from app.db import Base
-from app.deps import get_db
-from app.main import app
 from app.models import User
 from app.security import ALGORITHM, create_access_token
-
-SECRET = "test-secret-that-is-long-enough-for-hs256"
-
-
-@pytest.fixture()
-def engine():
-    # StaticPool keeps one connection, so every request sees the same in-memory database.
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    yield engine
-    engine.dispose()
-
-
-@pytest.fixture()
-def client(engine, monkeypatch):
-    monkeypatch.setenv("JWT_SECRET", SECRET)
-
-    def override_get_db():
-        with Session(engine, expire_on_commit=False) as db:
-            yield db
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
 
 
 def register(client, email="a@example.com", password="correct-horse"):
