@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.db import Base, make_engine
-from app.deps import get_db
+from app.categorization.providers import FakeProvider
+from app.deps import get_db, get_llm_provider
 from app.main import app
 
 SECRET = "test-secret-that-is-long-enough-for-hs256"
@@ -37,7 +38,13 @@ def engine():
 
 
 @pytest.fixture()
-def client(engine, monkeypatch):
+def provider():
+    """The provider every request in a test shares, so tests can count its calls."""
+    return FakeProvider()
+
+
+@pytest.fixture()
+def client(engine, provider, monkeypatch):
     monkeypatch.setenv("JWT_SECRET", SECRET)
 
     def override_get_db():
@@ -45,6 +52,7 @@ def client(engine, monkeypatch):
             yield db
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_llm_provider] = lambda: provider
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

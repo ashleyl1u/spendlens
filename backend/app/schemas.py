@@ -53,6 +53,8 @@ class UploadResult(BaseModel):
     inserted: int
     skipped_duplicates: int
     total_rows: int
+    # How many of the inserted rows each step categorized: {"rule": .., "cache": .., "llm": ..}
+    categorized_by: dict[str, int]
 
 
 class TransactionOut(BaseModel):
@@ -66,6 +68,8 @@ class TransactionOut(BaseModel):
     raw_description: str
     merchant: str | None
     category: str | None
+    category_source: str | None
+    confidence: float | None
     is_transfer: bool
     needs_review: bool
 

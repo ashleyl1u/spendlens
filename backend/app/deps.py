@@ -8,6 +8,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session, sessionmaker
 
+from .categorization.providers import LLMProvider, get_provider
 from .db import make_engine, make_session_factory
 from .models import User
 from .security import decode_access_token
@@ -47,3 +48,10 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_llm_provider() -> LLMProvider:
+    return get_provider()
+
+
+Provider = Annotated[LLMProvider, Depends(get_llm_provider)]
