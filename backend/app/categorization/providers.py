@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from .. import gemini
 from .categories import CATEGORIES, OTHER
 
 logger = logging.getLogger(__name__)
@@ -111,14 +112,6 @@ class FakeProvider(LLMProvider):
         return Result(OTHER, 0.4)
 
 
-class GeminiError(Exception):
-    """A Gemini call that failed in a way worth one retry (429 or 5xx)."""
-
-    def __init__(self, message: str, retry_after: float | None = None):
-        super().__init__(message)
-        self.retry_after = retry_after
-
-
 class GeminiProvider(LLMProvider):
     """Categorizes merchants with the Gemini API's generateContent endpoint.
 
@@ -130,11 +123,9 @@ class GeminiProvider(LLMProvider):
 
     name = "gemini"
 
-    BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-    DEFAULT_MODEL = "gemini-3.5-flash-lite"
-    DEFAULT_TIMEOUT_SECONDS = 20.0
-    RETRY_BACKOFF_SECONDS = 2.0
-    MAX_RETRY_AFTER_SECONDS = 10.0  # never stall an upload longer than this on a 429
+    DEFAULT_MODEL = gemini.DEFAULT_MODEL
+    RETRY_BACKOFF_SECONDS = gemini.RETRY_BACKOFF_SECONDS
+    MAX_RETRY_AFTER_SECONDS = gemini.MAX_RETRY_AFTER_SECONDS
 
     SYSTEM_PROMPT = (
         "You categorize merchant names from Canadian credit card statements. "
@@ -148,18 +139,13 @@ class GeminiProvider(LLMProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = DEFAULT_MODEL,
-        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        model: str = gemini.DEFAULT_MODEL,
+        timeout: float = gemini.DEFAULT_TIMEOUT_SECONDS,
         transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ):
-        if not api_key:
-            raise RuntimeError("GEMINI_API_KEY is not set")
-        self._api_key = api_key
+        self._client = gemini.GeminiClient(api_key, model, timeout, transport, sleep)
         self.model = model
-        self.timeout = timeout
-        self._transport = transport  # tests pass httpx.MockTransport
-        self._sleep = sleep
 
     def __repr__(self) -> str:  # keep the key out of tracebacks and debug output
         return f"GeminiProvider(model={self.model!r})"
@@ -204,9 +190,11 @@ class GeminiProvider(LLMProvider):
 
     def _categorize(self, merchants: list[str]) -> list[Result]:
         try:
-            data = self._post_with_retry(self.request_body(merchants))
+            data = self._client.generate(self.request_body(merchants))
             return self._parse(data)
-        except (httpx.HTTPError, GeminiError, ValueError, KeyError, IndexError, TypeError) as exc:
+        except (
+            httpx.HTTPError, gemini.GeminiError, ValueError, KeyError, IndexError, TypeError
+        ) as exc:
             # Only the exception type and status are logged: never the key, and never
             # the response body, which can echo the request back.
             logger.warning(
@@ -214,26 +202,9 @@ class GeminiProvider(LLMProvider):
                 "marking them for review",
                 len(merchants),
                 type(exc).__name__,
-                _describe(exc),
+                gemini.describe_error(exc),
             )
             return [FALLBACK] * len(merchants)
-
-    def _post_with_retry(self, body: dict) -> dict:
-        try:
-            return self._post(body)
-        except GeminiError as exc:
-            delay = exc.retry_after or self.RETRY_BACKOFF_SECONDS
-            self._sleep(min(delay, self.MAX_RETRY_AFTER_SECONDS))
-            return self._post(body)
-
-    def _post(self, body: dict) -> dict:
-        url = f"{self.BASE_URL}/models/{self.model}:generateContent"
-        with httpx.Client(timeout=self.timeout, transport=self._transport) as client:
-            response = client.post(url, json=body, headers={"x-goog-api-key": self._api_key})
-        if response.status_code == 429 or response.status_code >= 500:
-            raise GeminiError(f"HTTP {response.status_code}", _retry_after(response))
-        response.raise_for_status()
-        return response.json()
 
     @staticmethod
     def _parse(data: dict) -> list[Result]:
@@ -252,33 +223,12 @@ class GeminiProvider(LLMProvider):
         ]
 
 
-def _retry_after(response: httpx.Response) -> float | None:
-    try:
-        return float(response.headers["retry-after"])
-    except (KeyError, ValueError):
-        return None
-
-
-def _describe(exc: Exception) -> str:
-    if isinstance(exc, httpx.HTTPStatusError):
-        return f"HTTP {exc.response.status_code}"
-    if isinstance(exc, httpx.TimeoutException):
-        return "timed out"
-    return str(exc)[:200]
-
-
 def get_provider() -> LLMProvider:
     """Build the provider named by LLM_PROVIDER (default "fake")."""
     name = os.environ.get("LLM_PROVIDER", "fake").strip().lower()
     if name == "fake":
         return FakeProvider()
     if name == "gemini":
-        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-        if not api_key:
-            raise RuntimeError(
-                "LLM_PROVIDER=gemini but GEMINI_API_KEY is not set; add it to .env "
-                "or set LLM_PROVIDER=fake"
-            )
-        model = os.environ.get("GEMINI_MODEL", "").strip() or GeminiProvider.DEFAULT_MODEL
-        return GeminiProvider(api_key=api_key, model=model)
+        settings = gemini.settings_from_env()
+        return GeminiProvider(api_key=settings.api_key, model=settings.model)
     raise RuntimeError(f"Unknown LLM_PROVIDER {name!r}; use 'fake' or 'gemini'")
