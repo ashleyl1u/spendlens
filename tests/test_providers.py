@@ -5,6 +5,7 @@ import inspect
 import pytest
 
 from app.categorization.providers import (
+    FALLBACK,
     INVALID_CONFIDENCE,
     FakeProvider,
     LLMProvider,
@@ -42,14 +43,18 @@ def test_fake_provider_records_what_it_was_sent():
     assert provider.calls == [["A", "B"]]
 
 
+def test_fallback_is_low_confidence_other():
+    assert (FALLBACK.category, FALLBACK.confidence) == ("Other", INVALID_CONFIDENCE)
+
+
 def test_category_outside_the_list_becomes_low_confidence_other():
     provider = ScriptedProvider([Result("Pizza", 0.99), Result("dining", 0.9)])
-    assert provider.categorize(["A", "B"]) == [Result("Other", INVALID_CONFIDENCE)] * 2
+    assert provider.categorize(["A", "B"]) == [FALLBACK] * 2
 
 
 def test_malformed_results_become_low_confidence_other():
     provider = ScriptedProvider([None, {"category": "Dining"}, Result("Dining", "high")])
-    assert provider.categorize(["A", "B", "C"]) == [Result("Other", INVALID_CONFIDENCE)] * 3
+    assert provider.categorize(["A", "B", "C"]) == [FALLBACK] * 3
 
 
 def test_confidence_is_clamped():
@@ -57,14 +62,20 @@ def test_confidence_is_clamped():
     assert provider.categorize(["A", "B"]) == [Result("Dining", 1.0), Result("Dining", 0.0)]
 
 
-def test_wrong_number_of_results_is_fixed_up():
+def test_wrong_number_of_results_marks_the_whole_batch_for_review():
+    # With a missing or extra answer we cannot tell which answer is whose.
     short = ScriptedProvider([Result("Dining", 0.9)])
-    assert short.categorize(["A", "B"]) == [
-        Result("Dining", 0.9),
-        Result("Other", INVALID_CONFIDENCE),
-    ]
+    assert short.categorize(["A", "B"]) == [FALLBACK, FALLBACK]
     long = ScriptedProvider([Result("Dining", 0.9)] * 3)
-    assert len(long.categorize(["A"])) == 1
+    assert long.categorize(["A"]) == [FALLBACK]
+    assert ScriptedProvider("not a list").categorize(["A"]) == [FALLBACK]
+
+
+def test_fallbacks_are_not_cacheable_but_real_answers_are():
+    provider = ScriptedProvider([Result("Pizza", 0.9), Result("Dining", 0.9)])
+    invalid, valid = provider.categorize(["A", "B"])
+    assert invalid.cacheable is False
+    assert valid.cacheable is True
 
 
 def test_providers_only_receive_merchant_names():
@@ -81,6 +92,6 @@ def test_llm_provider_defaults_to_fake(monkeypatch):
 
 
 def test_unknown_llm_provider_is_refused(monkeypatch):
-    monkeypatch.setenv("LLM_PROVIDER", "gemini")
-    with pytest.raises(RuntimeError, match="gemini"):
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    with pytest.raises(RuntimeError, match="openai"):
         get_provider()

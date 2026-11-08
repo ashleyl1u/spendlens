@@ -87,7 +87,12 @@ def _ask_provider(provider: LLMProvider, merchants: list[str]) -> dict[str, Resu
 
 
 def _remember(db: Session, user_id: int, results: dict[str, Result]) -> None:
-    """Store LLM answers in the user's cache. A user's own correction is never overwritten."""
+    """Store LLM answers in the user's cache. A user's own correction is never overwritten.
+
+    Fallbacks from a failed call or an invalid answer are not stored, so those merchants
+    are asked about again next time instead of being stuck as Other.
+    """
+    results = {merchant: r for merchant, r in results.items() if r.cacheable}
     if not results:
         return
     insert = dialect_insert(db)

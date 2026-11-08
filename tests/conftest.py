@@ -46,6 +46,8 @@ def provider():
 @pytest.fixture()
 def client(engine, provider, monkeypatch):
     monkeypatch.setenv("JWT_SECRET", SECRET)
+    # The app checks LLM_PROVIDER at startup; tests never use a real provider.
+    monkeypatch.setenv("LLM_PROVIDER", "fake")
 
     def override_get_db():
         with Session(engine, expire_on_commit=False) as db:
