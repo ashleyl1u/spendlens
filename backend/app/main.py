@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from .categorization.providers import get_provider
-from .routers import accounts, auth, transactions, uploads
+from .routers import accounts, auth, dashboard, transactions, uploads
 
 
 @asynccontextmanager
@@ -19,6 +19,7 @@ app.include_router(auth.router)
 app.include_router(accounts.router)
 app.include_router(uploads.router)
 app.include_router(transactions.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/health")
