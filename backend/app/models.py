@@ -107,3 +107,27 @@ class Transaction(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class MerchantCategory(Base):
+    """A user's remembered category for one normalized merchant name.
+
+    Filled from LLM answers so the same merchant is never sent twice, and later from
+    the user's own corrections. Rule matches are not stored: rules are cheap to rerun,
+    and storing them would hide later improvements to the rules.
+    """
+
+    __tablename__ = "merchant_categories"
+    __table_args__ = (
+        UniqueConstraint("user_id", "merchant", name="uq_merchant_categories_user_merchant"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    merchant: Mapped[str] = mapped_column(String(200))
+    category: Mapped[str] = mapped_column(String(50))
+    source: Mapped[str] = mapped_column(String(20))  # llm, user
+    confidence: Mapped[float] = mapped_column(Float)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

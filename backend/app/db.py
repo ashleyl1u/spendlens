@@ -25,3 +25,16 @@ def make_engine(url: str | None = None) -> Engine:
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:
     return sessionmaker(engine, expire_on_commit=False)
+
+
+def dialect_insert(session: Session):
+    """The INSERT construct for the session's database, which supports ON CONFLICT.
+
+    Postgres runs the app and SQLite runs the tests; both have ON CONFLICT, but
+    SQLAlchemy exposes it per dialect.
+    """
+    if session.get_bind().dialect.name == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    return insert

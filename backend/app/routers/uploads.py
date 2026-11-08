@@ -3,13 +3,14 @@ from decimal import InvalidOperation
 from typing import Annotated
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..adapters.base import ParsedTransaction
 from ..adapters.rbc_credit_card import RBCCreditCardAdapter
-from ..deps import CurrentUser, DbSession
+from ..categorization.pipeline import categorize_transactions
+from ..db import dialect_insert
+from ..deps import CurrentUser, DbSession, Provider
 from ..models import Transaction, Upload
 from ..schemas import UploadResult
 from .accounts import get_owned_account
@@ -51,25 +52,28 @@ def parse_statement(csv_text: str) -> list[ParsedTransaction]:
     return parsed
 
 
-def insert_new_transactions(db: Session, rows: list[dict]) -> int:
+def insert_new_transactions(db: Session, rows: list[dict]) -> list[Transaction]:
     """Insert rows, silently skipping any whose (account_id, row_hash) already exists.
 
-    Returns how many were actually inserted.
+    Returns only the transactions that were actually inserted.
     """
-    insert = pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
     statement = (
-        insert(Transaction)
+        dialect_insert(db)(Transaction)
         .values(rows)
         .on_conflict_do_nothing(index_elements=["account_id", "row_hash"])
         .returning(Transaction.id)
     )
-    return len(db.execute(statement).all())
+    new_ids = list(db.scalars(statement))
+    if not new_ids:
+        return []
+    return list(db.scalars(select(Transaction).where(Transaction.id.in_(new_ids))))
 
 
 @router.post("", response_model=UploadResult, status_code=status.HTTP_201_CREATED)
 def create_upload(
     db: DbSession,
     user: CurrentUser,
+    provider: Provider,
     account_id: Annotated[int, Form()],
     file: Annotated[UploadFile, File(description="CSV statement export")],
 ) -> UploadResult:
@@ -101,14 +105,19 @@ def create_upload(
         ],
     )
 
+    # Only new rows are categorized, so a re-upload never touches rows the user has
+    # already reviewed or corrected.
+    sources = categorize_transactions(db, user.id, inserted, provider)
+
     upload.status = "completed"
-    upload.row_count = inserted
+    upload.row_count = len(inserted)
     db.commit()
 
     return UploadResult(
         upload_id=upload.id,
         account_id=account.id,
-        inserted=inserted,
-        skipped_duplicates=len(parsed) - inserted,
+        inserted=len(inserted),
+        skipped_duplicates=len(parsed) - len(inserted),
         total_rows=len(parsed),
+        categorized_by=sources,
     )
