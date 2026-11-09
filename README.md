@@ -32,6 +32,33 @@ fails an upload. That batch's merchants are saved as `Other` with low confidence
 Rate limits and server errors get one retry after a short wait. The API key is sent
 in a header and is never logged.
 
+## Correcting categories
+
+`PATCH /transactions/{id}` with `{"category": "Groceries", "apply_to_merchant": true}`
+sets a transaction's category. It returns the updated transaction plus `also_updated`,
+the number of other transactions changed.
+
+- **The transaction** gets the category with `category_source = "user"`, confidence 1.0
+  and `needs_review` cleared.
+- **Your merchant cache** gets a `user` entry for the transaction's merchant (for
+  example `TIM HORTONS`). Uploads check your cache before the rules and the LLM, and
+  an LLM answer never overwrites a `user` entry, so every later upload of that merchant
+  gets your category without asking the model. Correcting the same merchant again
+  replaces the entry.
+- **With `apply_to_merchant` (the default)**, your other transactions from the same
+  merchant change too. Transfers are skipped, and so are rows you corrected yourself,
+  so an earlier deliberate choice is never overwritten. With `false`, only that
+  transaction changes, but the merchant is still remembered for future uploads.
+
+All three changes happen in one database transaction. Corrections are per user and
+never affect anyone else's categories or cache. Transfers (card payments) can't be
+recategorized (400), and the category must be one of the fixed categories (422).
+Dashboards and the assistant read the transaction rows, so they reflect corrections
+straight away.
+
+To build a review queue, `GET /transactions` takes `needs_review=true` and
+`category=<name>` filters alongside `limit` and `offset`.
+
 ## Question assistant
 
 `POST /assistant/ask` with `{"question": "How much did I spend on dining last month?"}`

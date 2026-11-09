@@ -4,6 +4,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from .categorization.categories import CATEGORIES
+
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -79,3 +81,20 @@ class TransactionPage(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class TransactionCorrection(BaseModel):
+    category: str
+    # Also recategorize the user's other transactions from the same merchant.
+    apply_to_merchant: bool = True
+
+    @field_validator("category")
+    @classmethod
+    def known_category(cls, value: str) -> str:
+        if value not in CATEGORIES:
+            raise ValueError(f"category must be one of: {', '.join(CATEGORIES)}")
+        return value
+
+
+class CorrectedTransaction(TransactionOut):
+    also_updated: int
