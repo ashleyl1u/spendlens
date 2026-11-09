@@ -226,6 +226,13 @@ __marimo__/
 # real bank data (only the synthetic fixtures are allowed in the repo)
 *.csv
 !tests/fixtures/*.csv
+# hand-labeled evaluation data (descriptions and categories only, no card numbers or
+# amounts), committed so CI runs the rules regression guard in tests/test_eval.py
+!eval/labeled_merchants.csv
+!eval/should_flag.csv
+!eval/holdout.csv
+# evaluation reports stay local
+eval/results/
 *.pdf
 *.xlsx
 

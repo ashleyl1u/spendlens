@@ -35,16 +35,8 @@ def categorize_transactions(
         ]
 
     merchants = {t.merchant for t in transactions if not t.is_transfer and t.merchant}
-    decided = _from_cache(db, user_id, merchants)
-    for merchant in merchants - decided.keys():
-        category = match_rule(merchant)
-        if category:
-            decided[merchant] = ("rule", Result(category, RULE_CONFIDENCE))
-
-    remaining = sorted(merchants - decided.keys())
-    llm_results = _ask_provider(provider, remaining)
-    _remember(db, user_id, llm_results)
-    decided.update({m: ("llm", result) for m, result in llm_results.items()})
+    decided = decide_categories(merchants, provider, cached=_from_cache(db, user_id, merchants))
+    _remember(db, user_id, {m: result for m, (source, result) in decided.items() if source == "llm"})
 
     counts = Counter({source: 0 for source in SOURCES})
     for transaction in transactions:
@@ -62,6 +54,26 @@ def categorize_transactions(
 
     db.flush()
     return dict(counts)
+
+
+def decide_categories(
+    merchants: set[str],
+    provider: LLMProvider,
+    cached: dict[str, tuple[str, Result]] | None = None,
+) -> dict[str, tuple[str, Result]]:
+    """The pipeline's decision order for normalized merchant names, with no database:
+    cache entries first, then rules, then the provider for whatever is left (batched,
+    each merchant once). Returns {merchant: (source, result)}.
+    """
+    decided = dict(cached or {})
+    for merchant in merchants - decided.keys():
+        category = match_rule(merchant)
+        if category:
+            decided[merchant] = ("rule", Result(category, RULE_CONFIDENCE))
+
+    remaining = sorted(merchants - decided.keys())
+    decided.update({m: ("llm", r) for m, r in _ask_provider(provider, remaining).items()})
+    return decided
 
 
 def _from_cache(
