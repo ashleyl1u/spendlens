@@ -241,3 +241,9 @@ pgdata/
 .vscode/
 .idea/
 .DS_Store
+
+# frontend
+frontend/node_modules/
+frontend/dist/
+# the Python template's lib/ rule above would otherwise hide the frontend's source
+!frontend/src/lib/

@@ -1,0 +1,533 @@
+/*
+ * spendlens styles. Colors are tokens on :root with a dark set under
+ * prefers-color-scheme. The chart series color is the validated slot-1 blue for each
+ * mode; every text color clears 4.5:1 on its surface.
+ */
+
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e; /* 7.7:1, used for all small text including axis ticks */
+  --border: rgba(11, 11, 11, 0.12);
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --series-1: #2a78d6; /* 3:1+ on --surface, validated */
+  --accent: #1c5cab; /* links, 6.5:1 */
+  --accent-fill: #256abf; /* primary button; white text 5.4:1 */
+  --accent-fill-hover: #1c5cab;
+  --focus: #1c5cab;
+  --hover-wash: rgba(42, 120, 214, 0.08);
+  --error: #b42318;
+  --error-bg: #fdecea;
+  --success: #006300;
+  --success-bg: #e8f5e8;
+  --info-bg: #e9f1fb;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(11, 11, 11, 0.06);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--page);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --border: rgba(255, 255, 255, 0.12);
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --series-1: #3987e5; /* validated against #1a1a19 */
+    --accent: #86b6ef;
+    --accent-fill: #256abf;
+    --accent-fill-hover: #1c5cab;
+    --focus: #86b6ef;
+    --hover-wash: rgba(57, 135, 229, 0.14);
+    --error: #ff8a80;
+    --error-bg: #3a1714;
+    --success: #0ca30c;
+    --success-bg: #11280f;
+    --info-bg: #16263a;
+    --shadow: none;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  min-width: 0;
+}
+
+h1,
+h2 {
+  line-height: 1.25;
+  margin: 0 0 0.75rem;
+}
+h1 {
+  font-size: 1.6rem;
+}
+h2 {
+  font-size: 1.1rem;
+}
+p {
+  margin: 0 0 0.75rem;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  z-index: 10;
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+/* --- layout ----------------------------------------------------------------- */
+
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.site-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.75rem 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+}
+.brand {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.nav-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nav-list a {
+  display: inline-block;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.nav-list a:hover {
+  background: var(--hover-wash);
+}
+.nav-list a.active {
+  background: var(--hover-wash);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+.account-menu {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.user-email {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14rem;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 16px 3rem;
+}
+.page:focus {
+  outline: none;
+}
+.lede {
+  color: var(--text-secondary);
+  margin-bottom: 1.25rem;
+}
+.page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.page-heading h1 {
+  margin: 0;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  min-width: 0;
+}
+.card.narrow {
+  max-width: 34rem;
+}
+
+.two-column {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+.two-column > .card {
+  margin-bottom: 0;
+}
+.two-column + .card,
+.card + .two-column {
+  margin-top: 1rem;
+}
+
+/* --- forms ------------------------------------------------------------------- */
+
+.field {
+  margin-bottom: 1rem;
+}
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+input,
+select {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--axis);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  width: 100%;
+  max-width: 100%;
+  min-height: 44px;
+}
+input[type="file"] {
+  padding: 0.45rem;
+}
+input[aria-invalid="true"] {
+  border-color: var(--error);
+}
+.hint {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin: 0.3rem 0 0;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+.field-inline {
+  margin: 0;
+}
+.field-inline input {
+  width: auto;
+}
+
+.button {
+  font: inherit;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 0.55rem 1rem;
+  min-height: 44px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+.button-primary {
+  background: var(--accent-fill);
+  color: #ffffff;
+}
+.button-primary:hover:not(:disabled) {
+  background: var(--accent-fill-hover);
+}
+.button-secondary {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--axis);
+}
+.button-secondary:hover {
+  background: var(--hover-wash);
+}
+.button-block {
+  width: 100%;
+}
+
+/* --- auth ---------------------------------------------------------------------- */
+
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 16px;
+}
+.auth-card {
+  width: 100%;
+  max-width: 26rem;
+}
+.auth-switch {
+  margin: 1rem 0 0;
+  color: var(--text-secondary);
+}
+
+/* --- status messages -------------------------------------------------------- */
+
+.status {
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+.status p:last-child {
+  margin-bottom: 0;
+}
+.status-loading {
+  color: var(--text-secondary);
+  padding-left: 0;
+}
+.status-error {
+  background: var(--error-bg);
+  color: var(--error);
+  border: 1px solid currentColor;
+}
+.status-error .button {
+  margin-top: 0.5rem;
+  color: var(--text-primary);
+}
+.status-success {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.status-info {
+  background: var(--info-bg);
+}
+.status-empty {
+  background: var(--surface);
+  border: 1px dashed var(--axis);
+  padding: 1.5rem;
+  text-align: center;
+}
+.status-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+/* --- accounts and upload --------------------------------------------------- */
+
+.account-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+}
+.account-item {
+  display: flex;
+  flex-direction: column;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--grid);
+}
+.account-name {
+  font-weight: 600;
+}
+.account-meta {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.result {
+  margin-top: 1rem;
+}
+
+/* --- dashboard ----------------------------------------------------------------- */
+
+.stat-grid {
+  display: grid;
+  /* Two cards per row on a phone, four on a desktop. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.stat {
+  margin: 0;
+}
+.stat-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.stat-value-small {
+  font-size: 1.05rem;
+  padding-top: 0.4rem;
+}
+.stat-hint {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin: 0.25rem 0 0;
+}
+
+.chart {
+  margin: 0;
+  min-width: 0;
+}
+.chart-with-table {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .chart-with-table {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.chart-tooltip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.7rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  font-size: 0.875rem;
+}
+.chart-tooltip p {
+  margin: 0;
+}
+.chart-tooltip-title {
+  font-weight: 700;
+}
+.chart-tooltip-meta {
+  color: var(--text-secondary);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--grid);
+}
+.data-table thead th {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.data-table tbody th {
+  font-weight: 500;
+}
+.data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.table-toggle {
+  margin-top: 0.75rem;
+}
+.table-toggle summary {
+  cursor: pointer;
+  color: var(--accent);
+  padding: 0.25rem 0;
+}
+.table-toggle[open] summary {
+  margin-bottom: 0.5rem;
+}
+
+.merchant-list {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+.merchant-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--grid);
+}
+.merchant-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.merchant-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.merchant-count {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* Recharts' keyboard layer focuses the SVG; give it the same visible ring. */
+.recharts-wrapper:focus-within,
+.recharts-surface:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.recharts-surface:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
