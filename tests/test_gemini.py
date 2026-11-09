@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.categorization.categories import CATEGORIES
 from app.categorization.providers import (
+    FAILED,
     FALLBACK,
     GeminiProvider,
     Result,
@@ -102,8 +103,57 @@ def test_request_shape():
     assert config["temperature"] == 0
     assert config["responseMimeType"] == "application/json"
     results_schema = config["responseJsonSchema"]["properties"]["results"]
-    assert results_schema["minItems"] == results_schema["maxItems"] == len(MERCHANTS)
     assert results_schema["items"]["properties"]["category"]["enum"] == list(CATEGORIES)
+
+
+def test_prompt_defines_every_category():
+    from app.categorization.categories import CATEGORY_DEFINITIONS
+
+    assert list(CATEGORY_DEFINITIONS) == list(CATEGORIES)
+    assert all(meaning.strip() for meaning in CATEGORY_DEFINITIONS.values())
+
+    server = FakeGemini(gemini_reply(GOOD))
+    make_provider(server).categorize(MERCHANTS)
+    prompt = json.loads(server.requests[0].content)["systemInstruction"]["parts"][0]["text"]
+    for name, meaning in CATEGORY_DEFINITIONS.items():
+        assert f"- {name}: {meaning}." in prompt
+    # The conventions the eval found Gemini getting wrong without definitions.
+    assert "postage" in CATEGORY_DEFINITIONS["Other"]
+    assert "government" in CATEGORY_DEFINITIONS["Other"]
+    assert "liquor" in CATEGORY_DEFINITIONS["Shopping"]
+    # Vague names must come back with low confidence, so they get flagged for review.
+    assert "does not say what the business sells" in prompt
+    assert "below 0.5" in prompt
+
+
+def test_prompt_is_static_and_holds_no_user_data():
+    """Definitions live in the system instruction, which is the same for every request;
+    the only per-request content is still the merchant list and the categories."""
+    first, second = FakeGemini(gemini_reply(GOOD)), FakeGemini(gemini_reply(GOOD))
+    make_provider(first).categorize(MERCHANTS)
+    make_provider(second).categorize(["A", "B", "C"])
+    bodies = [json.loads(s.requests[0].content) for s in (first, second)]
+    assert bodies[0]["systemInstruction"] == bodies[1]["systemInstruction"]
+    assert not any(m in json.dumps(bodies[0]["systemInstruction"]) for m in MERCHANTS)
+
+
+@pytest.mark.parametrize("size", [1, 45, 50, 200])
+def test_schema_has_no_item_count_constraint(size):
+    """Gemini answers 400 'Request contains an invalid argument' when minItems/maxItems
+    reach the mid-40s, which failed every full batch of 50. The count is checked in
+    code instead, so the schema must not carry it at any batch size."""
+    merchants = [f"MERCHANT {i}" for i in range(size)]
+    body = GeminiProvider(api_key=API_KEY).request_body(merchants)
+    results_schema = body["generationConfig"]["responseJsonSchema"]["properties"]["results"]
+    assert "minItems" not in results_schema and "maxItems" not in results_schema
+    assert "minItems" not in json.dumps(body) and "maxItems" not in json.dumps(body)
+
+
+def test_a_full_batch_with_a_short_reply_is_still_rejected():
+    reply = [{"category": "Dining", "confidence": 0.9}] * 49
+    merchants = [f"MERCHANT {i}" for i in range(50)]
+    results = make_provider(FakeGemini(gemini_reply(reply))).categorize(merchants)
+    assert results == [FAILED] * 50
 
 
 def test_request_contains_only_merchant_names_and_categories(client, provider, engine):
@@ -185,14 +235,14 @@ def test_invalid_category_becomes_other():
 )
 def test_malformed_output_falls_back(reply):
     results = make_provider(FakeGemini(reply)).categorize(MERCHANTS)
-    assert results == [FALLBACK] * len(MERCHANTS)
+    assert results == [FAILED] * len(MERCHANTS)
 
 
 @pytest.mark.parametrize("count", [2, 4])
 def test_wrong_number_of_items_falls_back(count):
     reply = [{"category": "Dining", "confidence": 0.9}] * count
     results = make_provider(FakeGemini(gemini_reply(reply))).categorize(MERCHANTS)
-    assert results == [FALLBACK] * len(MERCHANTS)
+    assert results == [FAILED] * len(MERCHANTS)
 
 
 # --- failures and retries ---------------------------------------------------
@@ -203,14 +253,14 @@ def test_timeout_falls_back_without_retrying(caplog):
     with caplog.at_level(logging.WARNING):
         results = make_provider(server).categorize(MERCHANTS)
 
-    assert results == [FALLBACK] * len(MERCHANTS)
+    assert results == [FAILED] * len(MERCHANTS)
     assert len(server.requests) == 1
     assert "timed out" in caplog.text
 
 
 def test_connection_error_falls_back():
     server = FakeGemini(httpx.ConnectError("no network"))
-    assert make_provider(server).categorize(MERCHANTS) == [FALLBACK] * len(MERCHANTS)
+    assert make_provider(server).categorize(MERCHANTS) == [FAILED] * len(MERCHANTS)
 
 
 @pytest.mark.parametrize("status", [429, 500, 503])
@@ -244,7 +294,7 @@ def test_gives_up_after_one_retry():
     server = FakeGemini(httpx.Response(429), httpx.Response(429))
     results = make_provider(server).categorize(MERCHANTS)
 
-    assert results == [FALLBACK] * len(MERCHANTS)
+    assert results == [FAILED] * len(MERCHANTS)
     assert len(server.requests) == 2
 
 
@@ -253,8 +303,47 @@ def test_client_errors_are_not_retried(status):
     server = FakeGemini(httpx.Response(status, json={"error": {"message": "nope"}}))
     results = make_provider(server).categorize(MERCHANTS)
 
-    assert results == [FALLBACK] * len(MERCHANTS)
+    assert results == [FAILED] * len(MERCHANTS)
     assert len(server.requests) == 1
+
+
+def test_googles_error_message_is_logged(caplog):
+    server = FakeGemini(httpx.Response(
+        400, json={"error": {"code": 400, "message": "Request contains an invalid argument.",
+                             "status": "INVALID_ARGUMENT"}},
+    ))
+    with caplog.at_level(logging.WARNING):
+        results = make_provider(server).categorize(MERCHANTS)
+
+    assert results == [FAILED] * len(MERCHANTS)
+    assert "HTTP 400: Request contains an invalid argument." in caplog.text
+    # The request body (merchant names) is never logged.
+    assert not any(merchant in caplog.text for merchant in MERCHANTS)
+
+
+def test_retried_errors_also_carry_googles_message(caplog):
+    busy = httpx.Response(503, json={"error": {"message": "The model is overloaded."}})
+    server = FakeGemini(busy, busy)
+    with caplog.at_level(logging.WARNING):
+        make_provider(server).categorize(MERCHANTS)
+    assert "HTTP 503: The model is overloaded." in caplog.text
+
+
+@pytest.mark.parametrize(
+    "response, expected",
+    [
+        (httpx.Response(400, json={"error": {"message": "x" * 500}}), "HTTP 400: " + "x" * 199 + "…"),
+        (httpx.Response(400, json={"error": {"message": "two\n  lines"}}), "HTTP 400: two lines"),
+        (httpx.Response(400, text="<html>Bad Request</html>"), "HTTP 400)"),
+        (httpx.Response(400, json={"error": "flat string"}), "HTTP 400)"),
+        (httpx.Response(400, json={"error": {"message": 42}}), "HTTP 400)"),
+    ],
+    ids=["truncated", "whitespace", "not-json", "no-message-field", "message-not-text"],
+)
+def test_error_message_is_short_and_safe(caplog, response, expected):
+    with caplog.at_level(logging.WARNING):
+        make_provider(FakeGemini(response)).categorize(MERCHANTS)
+    assert expected in caplog.text
 
 
 def test_api_key_is_never_logged(caplog):
@@ -266,6 +355,7 @@ def test_api_key_is_never_logged(caplog):
         provider.categorize(MERCHANTS)
 
     assert "Gemini categorization failed" in caplog.text
+    assert "HTTP 403: API key [redacted] not valid" in caplog.text
     assert API_KEY not in caplog.text
     assert API_KEY not in repr(provider)
 

@@ -5,6 +5,7 @@ import inspect
 import pytest
 
 from app.categorization.providers import (
+    FAILED,
     FALLBACK,
     INVALID_CONFIDENCE,
     FakeProvider,
@@ -45,6 +46,10 @@ def test_fake_provider_records_what_it_was_sent():
 
 def test_fallback_is_low_confidence_other():
     assert (FALLBACK.category, FALLBACK.confidence) == ("Other", INVALID_CONFIDENCE)
+    assert (FAILED.category, FAILED.confidence) == ("Other", INVALID_CONFIDENCE)
+    # An invalid answer is the model's mistake; a failed batch is no answer at all.
+    assert FALLBACK.failed is False and FAILED.failed is True
+    assert FALLBACK.cacheable is False and FAILED.cacheable is False
 
 
 def test_category_outside_the_list_becomes_low_confidence_other():
@@ -65,10 +70,10 @@ def test_confidence_is_clamped():
 def test_wrong_number_of_results_marks_the_whole_batch_for_review():
     # With a missing or extra answer we cannot tell which answer is whose.
     short = ScriptedProvider([Result("Dining", 0.9)])
-    assert short.categorize(["A", "B"]) == [FALLBACK, FALLBACK]
+    assert short.categorize(["A", "B"]) == [FAILED, FAILED]
     long = ScriptedProvider([Result("Dining", 0.9)] * 3)
-    assert long.categorize(["A"]) == [FALLBACK]
-    assert ScriptedProvider("not a list").categorize(["A"]) == [FALLBACK]
+    assert long.categorize(["A"]) == [FAILED]
+    assert ScriptedProvider("not a list").categorize(["A"]) == [FAILED]
 
 
 def test_fallbacks_are_not_cacheable_but_real_answers_are():

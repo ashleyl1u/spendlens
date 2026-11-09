@@ -18,12 +18,22 @@ RETRY_BACKOFF_SECONDS = 2.0
 MAX_RETRY_AFTER_SECONDS = 10.0  # never stall a request longer than this on a 429
 
 
-class GeminiError(Exception):
-    """A Gemini call that failed in a way worth one retry (429 or 5xx)."""
+MAX_ERROR_MESSAGE_CHARS = 200
 
-    def __init__(self, message: str, retry_after: float | None = None):
-        super().__init__(message)
+
+class GeminiAPIError(Exception):
+    """Gemini answered with an HTTP error. `message` is Google's own explanation (the
+    "message" field of its error JSON), truncated and with the API key removed."""
+
+    def __init__(self, status: int, message: str = "", retry_after: float | None = None):
+        super().__init__(f"HTTP {status}" + (f": {message}" if message else ""))
+        self.status = status
+        self.message = message
         self.retry_after = retry_after
+
+
+class GeminiError(GeminiAPIError):
+    """A Gemini call that failed in a way worth one retry (429 or 5xx)."""
 
 
 @dataclass(frozen=True)
@@ -47,8 +57,9 @@ def settings_from_env() -> GeminiSettings:
 class GeminiClient:
     """POSTs to generateContent with a timeout and one retry on 429 or 5xx.
 
-    Raises GeminiError (still failing after the retry), httpx.HTTPError (timeouts,
-    connection errors, other HTTP errors) or ValueError (a body that is not JSON).
+    Raises GeminiError (429 or 5xx, still failing after the retry), GeminiAPIError
+    (other HTTP errors, not retried), httpx.HTTPError (timeouts, connection errors) or
+    ValueError (a body that is not JSON).
     """
 
     def __init__(
@@ -82,10 +93,26 @@ class GeminiClient:
         url = f"{BASE_URL}/models/{self.model}:generateContent"
         with httpx.Client(timeout=self.timeout, transport=self._transport) as client:
             response = client.post(url, json=body, headers={"x-goog-api-key": self._api_key})
-        if response.status_code == 429 or response.status_code >= 500:
-            raise GeminiError(f"HTTP {response.status_code}", _retry_after(response))
-        response.raise_for_status()
+        status = response.status_code
+        if status == 429 or status >= 500:
+            raise GeminiError(status, self._error_message(response), _retry_after(response))
+        if status >= 400:
+            raise GeminiAPIError(status, self._error_message(response))
         return response.json()
+
+    def _error_message(self, response: httpx.Response) -> str:
+        """Google's error message, safe to log: only the "message" field (never the
+        request body), with the API key redacted, truncated."""
+        try:
+            message = response.json()["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            return ""
+        if not isinstance(message, str):
+            return ""
+        message = " ".join(message.replace(self._api_key, "[redacted]").split())
+        if len(message) > MAX_ERROR_MESSAGE_CHARS:
+            message = message[: MAX_ERROR_MESSAGE_CHARS - 1] + "…"
+        return message
 
 
 def _retry_after(response: httpx.Response) -> float | None:
@@ -97,8 +124,8 @@ def _retry_after(response: httpx.Response) -> float | None:
 
 def describe_error(exc: Exception) -> str:
     """A short, key-free description of a failure, safe to log."""
-    if isinstance(exc, httpx.HTTPStatusError):
-        return f"HTTP {exc.response.status_code}"
+    if isinstance(exc, GeminiAPIError):
+        return str(exc)
     if isinstance(exc, httpx.TimeoutException):
         return "timed out"
     return str(exc)[:200]

@@ -6,8 +6,24 @@
 
 import re
 
-# Payment processors put their own tag in front of the merchant: Square, Toast, PayPal.
-PROCESSOR_PREFIX = re.compile(r"^(?:SQ\s*\*|TST\s*[*-]|PAYPAL\s*\*|\*)\s*")
+# Payment processors put their own tag in front of the merchant: Square, Toast, PayPal,
+# DoorDash ("DD *DOORDASH WENDYS") and Shopify ("SP *MATCHA DIRECT").
+PROCESSOR_PREFIX = re.compile(r"^(?:SQ\s*\*|TST\s*[*-]|PAYPAL\s*\*|DD\s*\*|SP\s*\*|\*)\s*")
+
+# Brands that sell several different services, which belong in different categories:
+# "UBER *EATS" is a meal, "UBER* ONE MEMBERSHIP" a subscription, "UBER *TRIP" a ride.
+# For these brands the first word after the asterisk names the service and is kept,
+# whatever it is, so a service nobody has listed yet still gets its own merchant name
+# (and its own cache entry) instead of being merged into the bare brand. Skipped:
+# reference codes (any digit), web addresses, and a repeat of the brand
+# ("GOOGLE *GOOGLE ONE"). The listed words mean the brand's core service and collapse
+# to the bare brand.
+MULTI_SERVICE_BRANDS: dict[str, set[str]] = {
+    "UBER": {"TRIP", "PENDING"},
+    "GOOGLE": set(),
+    "AMAZON": set(),
+    "AMAZON.CA": set(),
+}
 
 PROVINCES = {"AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"}
 # Online services often end with a country code instead ("NETFLIX.COM 866-579-7172 CA").
@@ -48,13 +64,25 @@ def _strip_trailing_reference(tokens: list[str]) -> bool:
     return False
 
 
+def _service_word(brand: str, tail: str) -> str | None:
+    """The word after the asterisk that names one of a brand's services, if any."""
+    for word in tail.replace("*", " ").split():
+        if word == brand or "." in word or any(ch.isdigit() for ch in word):
+            continue  # "GOOGLE *GOOGLE ONE", "HELP.UBER.COM", "*1A2B3C4D5"
+        return None if word in MULTI_SERVICE_BRANDS[brand] else word
+    return None
+
+
 def normalize_merchant(raw_description: str) -> str:
     text = raw_description.upper().strip()
     text = PROCESSOR_PREFIX.sub("", text)
 
     # "UBER *TRIP HELP.UBER.COM" and "ACMECLOUD *STORAGE PLA": what follows the
-    # asterisk describes the product, not the merchant.
-    text = text.split("*", 1)[0] if "*" in text else text
+    # asterisk describes the product, not the merchant, except for a few platforms.
+    if "*" in text:
+        head, tail = (part.strip() for part in text.split("*", 1))
+        service = _service_word(head, tail) if head in MULTI_SERVICE_BRANDS else None
+        text = f"{head} {service}" if service else head
 
     # MCDONALD'S and MCDONALDS are the same place; commas and stray dashes are noise.
     text = text.replace("'", "").replace(",", " ")

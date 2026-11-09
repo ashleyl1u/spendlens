@@ -7,10 +7,16 @@ RULE_CONFIDENCE = 0.95
 # Checked in order and the first match wins, so put specific keywords before general
 # ones ("UBER EATS" before "UBER"). Keywords match whole words of the merchant name.
 RULES: list[tuple[str, tuple[str, ...]]] = [
+    # Services of brands that sell several kinds of thing. These come first so they win
+    # over the brand's general rule below ("UBER" -> Transport, "AMAZON" -> Shopping).
+    ("Subscriptions", (
+        "UBER ONE", "AMAZON PRIME", "PRIME VIDEO", "AMAZON MUSIC", "AMAZON WEB SERVICES",
+        "AWS", "KINDLE UNLIMITED", "AUDIBLE", "GOOGLE ONE", "GOOGLE CLOUD", "GOOGLE YOUTUBE",
+    )),
     ("Dining", ("UBER EATS", "DOORDASH", "SKIP THE DISHES", "SKIPTHEDISHES", "TACO BELL")),
     ("Transport", (
         "PRESTO", "UBER", "LYFT", "TTC", "GO TRANSIT", "UP EXPRESS", "COMPASS",
-        "SHELL", "ESSO", "PETRO-CANADA", "PETRO CANADA", "PIONEER", "IMPARK",
+        "SHELL", "ESSO", "PETRO-CANADA", "PETRO CANADA", "PIONEER", "IMPARK", "GAS BAR",
         "GREEN P", "PARKING",
     )),
     ("Groceries", (
@@ -25,7 +31,7 @@ RULES: list[tuple[str, tuple[str, ...]]] = [
     )),
     ("Subscriptions", (
         "SPOTIFY", "NETFLIX", "DISNEY PLUS", "DISNEYPLUS", "CRAVE", "APPLE.COM/BILL",
-        "YOUTUBE PREMIUM", "PATREON",
+        "YOUTUBE", "PATREON",
     )),
     ("Bills & Utilities", (
         "TELECOM", "ROGERS", "BELL", "TELUS", "FIDO", "KOODO", "VIRGIN PLUS", "FREEDOM MOBILE",

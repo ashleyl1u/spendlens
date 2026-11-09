@@ -183,7 +183,7 @@ class GeminiAssistant(Assistant):
     def respond(self, history: list[Message], today: date) -> ModelTurn:
         try:
             data = self._client.generate(self.request_body(history, today))
-        except (httpx.HTTPError, gemini.GeminiError, ValueError) as exc:
+        except (httpx.HTTPError, gemini.GeminiAPIError, ValueError) as exc:
             # Log the failure type only: never the key, the question or the body.
             logger.warning(
                 "Gemini assistant request failed (%s: %s)",
