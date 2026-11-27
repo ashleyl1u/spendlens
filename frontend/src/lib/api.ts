@@ -51,7 +51,7 @@ export function createApi(store: TokenStore, fetchImpl: typeof fetch = (...a) =>
       });
     } catch (error) {
       if ((error as Error).name === "AbortError") throw error;
-      throw new ApiError(0, "Can't reach the spendlens server. Is the backend running on port 8000?");
+      throw new ApiError(0, UNREACHABLE);
     }
 
     if (response.status === 401 && token) {
@@ -80,12 +80,20 @@ function withQuery(path: string, query: RequestOptions["query"]): string {
 }
 
 /** Turn a FastAPI error body into one readable sentence. */
+export const UNREACHABLE = "Can't reach the spendlens server. Is the backend running on port 8000?";
+
 export async function errorMessage(response: Response): Promise<string> {
+  const text = await response.text().catch(() => "");
   let detail: unknown;
   try {
-    detail = (await response.json()).detail;
+    detail = JSON.parse(text).detail;
   } catch {
-    return `The server answered ${response.status}. Please try again.`;
+    // Not JSON, so it didn't come from the API. The dev proxy answers 500 with an empty
+    // body when the backend is down, and gateways answer 502 or 504.
+    if (response.status === 502 || response.status === 504 || (response.status === 500 && !text.trim())) {
+      return UNREACHABLE;
+    }
+    return `The server had a problem (${response.status}). Please try again.`;
   }
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail) && detail.length > 0) {

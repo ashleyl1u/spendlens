@@ -4,8 +4,10 @@ import type { ReactNode } from "react";
 import { useAuth } from "./auth/useAuth";
 import { Layout } from "./components/Layout";
 import { AccountsPage } from "./pages/AccountsPage";
+import { AskPage } from "./pages/AskPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { AuthPage } from "./pages/AuthPage";
+import { TransactionsPage } from "./pages/TransactionsPage";
 import { UploadPage } from "./pages/UploadPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -49,6 +51,8 @@ export function App() {
         <Route index element={<DashboardPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="upload" element={<UploadPage />} />
+        <Route path="transactions" element={<TransactionsPage />} />
+        <Route path="ask" element={<AskPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

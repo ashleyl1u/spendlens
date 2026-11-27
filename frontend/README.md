@@ -1,7 +1,8 @@
 # spendlens frontend
 
 A small React app for spendlens: sign up and log in, add card accounts, upload RBC
-statements, and see a spending dashboard.
+statements, see a spending dashboard, fix categories, and ask questions about your
+spending.
 
 Built with Vite, React, TypeScript, React Router and Recharts, with plain CSS.
 
@@ -26,7 +27,7 @@ Built with Vite, React, TypeScript, React Router and Recharts, with plain CSS.
 3. Open http://localhost:5173.
 
 The Vite dev server proxies `/auth`, `/accounts`, `/uploads`, `/transactions`,
-`/dashboard` and `/assistant` to `http://127.0.0.1:8000`, so the browser only ever
+`/dashboard`, `/assistant` and `/categories` to `http://127.0.0.1:8000`, so the browser only ever
 talks to one origin and the backend needs no CORS setup. To use a backend on another
 port, set `SPENDLENS_API_URL`, for example `SPENDLENS_API_URL=http://127.0.0.1:8001 npm run dev`. A few of those paths are
 also pages in the app (`/accounts`). The proxy sends browser navigations, which ask
@@ -35,7 +36,7 @@ for HTML, to the app and only API calls, which ask for JSON, to the backend.
 ## Other commands
 
 ```bash
-npm test           # Vitest: the money formatter, token handling, upload wording
+npm test           # Vitest: money, token handling, upload and correction wording, tool calls
 npm run typecheck  # TypeScript, no output files
 npm run build      # type-check and build to dist/
 ```
@@ -60,3 +61,34 @@ For now, use `npm run dev`.
   a tab stop, and the table beside it carries every value. Text colors meet 4.5:1.
 - **Dates.** The dashboard's From and To dates are kept in the URL, so a refresh or a
   shared link shows the same range.
+
+## Transactions
+
+The Transactions page has two tabs. **Needs review** lists the transactions spendlens
+wasn't sure about; **All** lists everything. Both are paginated and can be filtered by
+category, and the tab, filter and page are kept in the URL. The nav shows how many
+transactions need review.
+
+Each row shows the date, the cleaned merchant above the original description, the
+amount, the category, how it was decided (Rule, Remembered, Model or You), and the
+confidence as a word and a percentage ("Low · 60%").
+
+To fix a category, choose one from the row's dropdown and press **Save**. Saving is a
+separate step because some browsers change a dropdown's value on every arrow-key
+press. With **Apply to all transactions from this merchant** checked (the default),
+your other transactions from the same merchant change too, except transfers and rows
+you corrected yourself. Either way, the merchant is remembered for future uploads.
+The result is shown in plain words, for example "Updated 3 transactions from TIM
+HORTONS to Groceries." In Needs review the corrected rows leave the list; in All they
+update in place.
+
+The category list comes from `GET /categories`, so it always matches the backend.
+Card payments (transfers) are shown but can't be recategorized.
+
+## Ask
+
+Ask a question in your own words, or pick an example. The page shows the answer, and
+"How I got this" lists the lookups the assistant made, such as "Top merchants · All
+time · Top 3". Each question is answered on its own: the assistant doesn't remember
+earlier questions. If the model service is down, the page says the assistant is
+unavailable.

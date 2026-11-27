@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createApi } from "./api";
+import { UNREACHABLE, createApi } from "./api";
 import { STORAGE_KEY, createTokenStore, isExpired } from "./tokenStore";
 
 const NOW = Date.UTC(2026, 10, 9, 12, 0, 0);
@@ -197,6 +197,19 @@ describe("api client and the token", () => {
     );
     await expect(request("/accounts", { body: { nickname: "x" } })).rejects.toThrow(
       /^Last 4 digits: String should match/,
+    );
+  });
+
+  it("explains an unreachable backend instead of a bare status", async () => {
+    const store = createTokenStore(memoryStorage(), () => NOW);
+    const empty500 = vi.fn(async () => new Response("", { status: 500 }));
+    const badGateway = vi.fn(async () => new Response("<html>Bad Gateway</html>", { status: 502 }));
+    const realCrash = vi.fn(async () => new Response("Internal Server Error", { status: 500 }));
+
+    await expect(createApi(store, empty500)("/categories")).rejects.toThrow(UNREACHABLE);
+    await expect(createApi(store, badGateway)("/categories")).rejects.toThrow(UNREACHABLE);
+    await expect(createApi(store, realCrash)("/categories")).rejects.toThrow(
+      "The server had a problem (500). Please try again.",
     );
   });
 });
