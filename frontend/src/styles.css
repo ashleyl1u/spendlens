@@ -531,3 +531,302 @@ input[aria-invalid="true"] {
     animation: none !important;
   }
 }
+
+/* --- part 2: transactions and ask ------------------------------------------ */
+
+.badge {
+  display: inline-block;
+  min-width: 1.4em;
+  margin-left: 0.4em;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  background: var(--accent-fill);
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--axis);
+  margin-bottom: 1rem;
+}
+.tab {
+  font: inherit;
+  background: none;
+  color: var(--text-secondary);
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 0.6rem 0.9rem;
+  min-height: 44px;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.tab[aria-selected="true"] {
+  color: var(--text-primary);
+  font-weight: 700;
+  border-bottom-color: var(--accent-fill);
+}
+.tab:hover {
+  background: var(--hover-wash);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.toolbar select {
+  width: auto;
+  min-width: 12rem;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+.checkbox input {
+  width: 1.15rem;
+  height: 1.15rem;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--accent-fill);
+}
+
+.transactions {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.transactions th,
+.transactions td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.6rem 0.5rem;
+  border-bottom: 1px solid var(--grid);
+}
+.transactions thead th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.transactions .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.merchant {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.raw-description {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.hint-inline {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+.category-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+.category-edit select {
+  width: auto;
+  min-width: 10rem;
+  padding: 0.35rem 0.5rem;
+}
+.button-small {
+  min-height: 36px;
+  padding: 0.3rem 0.8rem;
+}
+.row-error {
+  color: var(--error);
+  font-size: 0.85rem;
+  margin: 0.35rem 0 0;
+}
+
+/* Confidence: a shape and a word, not color alone. */
+.confidence {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+.confidence-mark {
+  display: inline-block;
+  flex: none;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+}
+.confidence-high .confidence-mark {
+  background: currentColor;
+}
+.confidence-medium .confidence-mark {
+  background: linear-gradient(to top, currentColor 50%, transparent 50%);
+}
+.confidence-low {
+  color: var(--error);
+  font-weight: 600;
+}
+.confidence-none .confidence-mark {
+  display: none;
+}
+.review-flag {
+  font-weight: 600;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.pagination .hint {
+  margin: 0;
+}
+
+/* On narrow screens each transaction becomes a small card, labelled field by field. */
+@media (max-width: 760px) {
+  .transactions thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .transactions,
+  .transactions tbody,
+  .transactions tr,
+  .transactions td {
+    display: block;
+    width: 100%;
+  }
+  .transactions tr {
+    border-bottom: 1px solid var(--axis);
+    padding: 0.5rem 0;
+  }
+  .transactions td {
+    border: none;
+    padding: 0.25rem 0;
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+  .transactions td::before {
+    content: attr(data-label);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    grid-row: 1 / span 2;
+  }
+  /* Everything in a cell (merchant and description, dropdown and error) stacks in the
+     value column, never under the label. */
+  .transactions td > * {
+    grid-column: 2;
+  }
+  .transactions .num {
+    text-align: left;
+  }
+  .category-edit select {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* Ask */
+.narrow-wide {
+  max-width: 46rem;
+}
+textarea {
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--surface);
+  border: 1px solid var(--axis);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  width: 100%;
+  resize: vertical;
+}
+.hint-warn {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.examples .hint {
+  margin: 0;
+}
+.chip {
+  font: inherit;
+  font-size: 0.875rem;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--axis);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  min-height: 36px;
+  cursor: pointer;
+  text-align: left;
+}
+.chip:hover {
+  background: var(--hover-wash);
+}
+.ask-error .status {
+  margin-bottom: 0.75rem;
+}
+.answer {
+  margin-top: 1rem;
+}
+.answer h2:focus {
+  outline: none;
+}
+.asked {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.answer-text {
+  font-size: 1.1rem;
+  white-space: pre-wrap;
+}
+.how summary {
+  cursor: pointer;
+  color: var(--accent);
+  padding: 0.25rem 0;
+}
+.tool-calls {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.5rem;
+}
+.tool-calls li {
+  padding: 0.3rem 0;
+}
+.tool-title {
+  display: block;
+  font-weight: 600;
+}
+.tool-details {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}

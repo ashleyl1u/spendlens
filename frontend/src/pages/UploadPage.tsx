@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { EmptyState, ErrorMessage, Loading } from "../components/Status";
 import { api } from "../lib/api";
+import { notifyTransactionsChanged } from "../lib/events";
 import type { Account, UploadResult } from "../lib/types";
 import { describeUpload } from "../lib/uploadSummary";
 import { useAsync } from "../lib/useAsync";
@@ -40,6 +41,7 @@ export function UploadPage() {
     try {
       const data = await api<UploadResult>("/uploads", { body: form });
       setResult({ data, filename: file.name });
+      if (data.inserted > 0) notifyTransactionsChanged(); // new rows may need review
       setFile(null);
       if (fileInput.current) fileInput.current.value = "";
     } catch (err) {

@@ -116,6 +116,45 @@ def test_correction_clears_needs_review(client, alice):
     assert transactions(client, alice, needs_review=True)["total"] == 0
 
 
+@pytest.mark.parametrize("apply_to_merchant", [True, False])
+def test_confirming_the_current_category_is_a_real_correction(
+    client, alice, engine, apply_to_merchant
+):
+    """The frontend's "Looks right" button PATCHes the category the row already has.
+    That must not be skipped as a no-op: it marks the row as the user's choice and
+    saves the merchant to the user's cache, so future uploads aren't flagged again."""
+    (rfbt,) = transactions(client, alice, needs_review=True)["items"]
+    assert (rfbt["category"], rfbt["category_source"], rfbt["needs_review"]) == (
+        "Dining", "llm", True
+    )
+    assert cache(engine, "alice@example.com")["RFBT-TORONTO YONGE ST"] == ("Dining", "llm", 0.6)
+
+    response = correct(
+        client, alice, rfbt["id"], "Dining", apply_to_merchant=apply_to_merchant
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["category"], body["category_source"], body["confidence"],
+            body["needs_review"], body["also_updated"]) == ("Dining", "user", 1.0, False, 0)
+    (stored,) = rows_for(client, alice, "RFBT-TORONTO YONGE ST")
+    assert (stored["category_source"], stored["confidence"], stored["needs_review"]) == (
+        "user", 1.0, False
+    )
+    # The provider's low-confidence answer in the cache becomes the user's choice.
+    assert cache(engine, "alice@example.com")["RFBT-TORONTO YONGE ST"] == ("Dining", "user", 1.0)
+
+
+def test_confirming_a_rule_category_also_writes_the_cache(client, alice, engine):
+    """Rule results are never cached, so confirming one creates the user's cache row."""
+    metro = rows_for(client, alice, "METRO")[0]
+    assert "METRO" not in cache(engine, "alice@example.com")
+
+    assert correct(client, alice, metro["id"], "Groceries").status_code == 200
+
+    assert cache(engine, "alice@example.com")["METRO"] == ("Groceries", "user", 1.0)
+
+
 def test_correcting_again_replaces_the_earlier_correction(client, alice, engine):
     (books,) = rows_for(client, alice, "MAPLE STREET BOOKS CO")
     correct(client, alice, books["id"], "Entertainment")

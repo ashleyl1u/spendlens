@@ -50,3 +50,41 @@ export interface MerchantTotal {
   total_cents: number;
   transaction_count: number;
 }
+
+export type CategorySource = "rule" | "cache" | "llm" | "user";
+
+export interface Transaction {
+  id: number;
+  account_id: number;
+  upload_id: number | null;
+  posted_date: string; // YYYY-MM-DD
+  amount_cents: number;
+  raw_description: string;
+  merchant: string | null;
+  category: string | null;
+  category_source: CategorySource | null;
+  confidence: number | null;
+  is_transfer: boolean;
+  needs_review: boolean;
+}
+
+export interface TransactionPage {
+  items: Transaction[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface CorrectedTransaction extends Transaction {
+  also_updated: number;
+}
+
+export interface ToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface AskResponse {
+  answer: string;
+  tool_calls: ToolCall[];
+}
